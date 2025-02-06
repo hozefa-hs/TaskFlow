@@ -6,19 +6,21 @@ import '../view_models/task_provider.dart';
 import '../view_models/theme_provider.dart';
 import 'add_task_screen.dart';
 
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/task_model.dart';
-import '../view_models/task_provider.dart';
-import 'add_task_screen.dart';
+final searchQueryProvider =
+    StateProvider<String>((ref) => ''); // Search query state
 
 class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDarkMode = ref.watch(themeProvider);
     final tasks = ref.watch(taskProvider);
-    final isTablet =
-        MediaQuery.of(context).size.width > 600; // 📌 Check screen size
+    final searchQuery = ref.watch(searchQueryProvider);
+    final isTablet = MediaQuery.of(context).size.width > 600;
+
+    final filteredTasks = tasks
+        .where((task) =>
+            task.title.toLowerCase().contains(searchQuery.toLowerCase()))
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -37,15 +39,25 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: isTablet
-          ? Row(
-              children: [
-                Expanded(
-                    child: TaskList(tasks: tasks, isTablet: true)), // Task List
-                Expanded(child: TaskDetailView()), // Task Details View
-              ],
-            )
-          : TaskList(tasks: tasks, isTablet: false), // Mobile View with Actions
+      body: Column(
+        children: [
+          _SearchBar(),
+          Expanded(
+            child: isTablet
+                ? Row(
+                    children: [
+                      Expanded(
+                          child:
+                              TaskList(tasks: filteredTasks, isTablet: true)),
+                      // Task List
+                      Expanded(child: TaskDetailView()),
+                      // Task Details View
+                    ],
+                  )
+                : TaskList(tasks: filteredTasks, isTablet: false),
+          ),
+        ],
+      ), // Mobile View with Actions
       floatingActionButton: FloatingActionButton(
         backgroundColor: CupertinoColors.activeBlue,
         child: Icon(
@@ -55,6 +67,42 @@ class HomeScreen extends ConsumerWidget {
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => AddTaskScreen()),
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchBar extends ConsumerStatefulWidget {
+  @override
+  _SearchBarState createState() => _SearchBarState();
+}
+
+class _SearchBarState extends ConsumerState<_SearchBar> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        FocusScope.of(context).unfocus();
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(10.0),
+        child: TextField(
+          focusNode: _focusNode,
+          onChanged: (value) =>
+              ref.read(searchQueryProvider.notifier).state = value,
+          decoration: InputDecoration(
+            hintText: "Search tasks...",
+            prefixIcon: Icon(Icons.search),
+            filled: true,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          ),
         ),
       ),
     );
